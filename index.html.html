@@ -1,0 +1,121 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>棒倒しゲーム（重力加速度あり）</title>
+  <style>
+    body { margin: 0; background: #87ce7a; overflow: hidden; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button id="fallBtn">倒す</button>
+    <button id="resetBtn">リセット</button>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
+  <script>
+    // ===== シーン・カメラ・レンダラー =====
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 50, 0); // 真上
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // ===== ライト =====
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(30, 50, 30);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x666666));
+
+    // ===== 床 =====
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshPhongMaterial({ color: 0x228b22 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // ===== 棒（円柱：pivotを使って底を固定） =====
+    const stickGeo = new THREE.CylinderGeometry(1, 1, 10, 32);
+    const stickMat = new THREE.MeshPhongMaterial({ color: 0x8b5a2b });
+    const stick = new THREE.Mesh(stickGeo, stickMat);
+
+    const pivot = new THREE.Group(); // 支点グループ
+    stick.position.y = 5;            // 棒の底をpivotの原点に合わせる
+    pivot.add(stick);
+    scene.add(pivot);
+
+    // ===== アニメーション用変数 =====
+    let angle = 0;                  // 現在の回転角度
+    let angularVelocity = 0;        // 角速度
+    let angularAcceleration = 0;    // 角加速度
+    const g = 0.02;                 // 重力っぽさの係数（調整可能）
+
+    let falling = false;
+    let axis = { x: 0, z: 0 };      // 倒れる方向
+
+    // ===== 倒すボタン =====
+    document.getElementById("fallBtn").addEventListener("click", () => {
+      if (falling) return;
+      falling = true;
+      angle = 0;
+      angularVelocity = 0;
+
+      // ランダム方向を決定
+      const randAngle = Math.random() * Math.PI * 2;
+      axis = { x: Math.cos(randAngle), z: Math.sin(randAngle) };
+    });
+
+    // ===== リセットボタン =====
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      pivot.rotation.set(0, 0, 0);
+      falling = false;
+      angle = 0;
+      angularVelocity = 0;
+    });
+
+    // ===== 描画ループ =====
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (falling && angle < Math.PI / 2) {
+        // 重力加速度っぽい回転
+        angularAcceleration = g * Math.cos(angle);
+        angularVelocity += angularAcceleration;
+        angle += angularVelocity;
+
+        if (angle > Math.PI / 2) angle = Math.PI / 2; // 床で止める
+
+        pivot.rotation.x = axis.z * angle;
+        pivot.rotation.z = -axis.x * angle;
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // ===== リサイズ対応 =====
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
